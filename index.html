@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Hidden-Object Drag Game</title>
 
-<!-- font -->
+<!-- custom font -->
 <style>
 @font-face{
   font-family:"MyArtFont";
@@ -15,176 +15,210 @@
 }
 </style>
 
-<!-- styles -->
+<!-- styling -->
 <style>
-:root{--accent:#2aaa3e;--fail:#c44}
+:root{--accent:#2aaa3e;--fail:#c44;--lens:45px}
 *{box-sizing:border-box;margin:0;padding:0}
+
 html,body{
-  height:100%;font-family:"MyArtFont",system-ui,sans-serif;
-  background:#f7f7f7;color:#222;
-  display:flex;flex-direction:column;align-items:center}
-h1{margin:1.4rem 0 .4rem;font-size:clamp(1.6rem,3vw,2.4rem)}
-#rules{font-size:.95rem;opacity:.8;margin-bottom:1.1rem;text-align:center}
+  height:100%;overflow:hidden;
+  font-family:"MyArtFont",system-ui,sans-serif;background:#f7f7f7;color:#222;
+  display:flex
+}
 
-#board{position:relative;max-width:650px;width:90vw;isolation:isolate}
-#board svg{width:100%;height:auto;display:block}
+/* === layout ===================================================== */
+#wordPane{
+  width:220px;min-width:180px;max-width:260px;
+  padding:1rem .75rem;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;
+  border-right:2px solid #e0e0e0;background:#f7f7f7
+}
+#boardPane{flex:1;display:flex;justify-content:center;align-items:center}
+#board{max-height:100%;max-width:100%;}
 
-#wordBank{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:.5rem;
-          justify-content:center;width:90vw;max-width:800px}
-.word{padding:.3rem .6rem;border:1.5px solid #333;border-radius:6px;
-      background:#fff;cursor:grab;user-select:none;transition:.2s;
-      display:flex;align-items:center;gap:.35rem;font-size:.95rem}
+/* figure scales with height */
+#board svg{height:95vh;width:auto;display:block}
+
+/* === word tiles ================================================ */
+.word{
+  display:block;padding:.4rem .65rem;border:0;border-radius:6px;
+  background:#f7f7f7;cursor:grab;user-select:none;transition:.18s;
+  font-size:.93rem
+}
+.word:hover{background:#fff}
 .word:active{cursor:grabbing}
-.word.found{background:var(--accent);border-color:var(--accent);
-            color:#fff;text-decoration:line-through;cursor:default}
-.word.fail {background:var(--fail);border-color:var(--fail);
-            color:#fff;text-decoration:line-through;cursor:default}
-.lives{font-size:.8em;opacity:.7}
+.word.found{background:var(--accent);color:#fff;cursor:default}
+.word.fail {background:var(--fail);color:#fff;cursor:default}
+.lives{font-size:.8em;opacity:.8;color:red;margin-left:.35rem}
 @keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(3px)}
-                30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
-.missed{animation:shake .25s}
+30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
+.missed{animation:shake .22s}
 
-/* lens  */
-.lens{position:fixed;z-index:10000;width:20px;height:20px;border-radius:50%;
-      background:#fff;mix-blend-mode:difference;pointer-events:none}
+/* === lens ======================================================= */
+.lens{
+  position:fixed;z-index:10000;width:var(--lens);height:var(--lens);
+  margin:-22.5px 0 0 -22.5px;border-radius:50%;background:#fff;
+  pointer-events:none;mix-blend-mode:difference}
 
-/* overlay */
-#overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
-         display:grid;place-items:center;opacity:0;pointer-events:none;transition:.3s}
-#overlay.show{opacity:1;pointer-events:auto}
-.dialog{background:#fff;padding:2rem 2.5rem;border-radius:12px;
-        box-shadow:0 6px 30px rgba(0,0,0,.25);text-align:center}
-.dialog h2{margin:0 0 .7rem;font-size:1.6rem}
-.dialog button{margin-top:1rem;padding:.55rem 1.3rem;border:none;border-radius:6px;
-               background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
-.dialog button:hover{filter:brightness(1.1)}
-
-/* LAST so it wins the cascade — hide ALL cursors during drag */
-html.dragging,html.dragging *{cursor:none !important}
+/* === overlays =================================================== */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:grid;place-items:center;opacity:0;pointer-events:none;transition:.3s}
+.overlay.show{opacity:1;pointer-events:auto}
+.modal{background:#fff;padding:2rem 2.5rem;border-radius:12px;
+       box-shadow:0 6px 30px rgba(0,0,0,.25);text-align:center;max-width:320px}
+.modal h3{margin:.2rem 0 1rem;font-size:1.35rem}
+.modal p{line-height:1.4;font-size:.94rem}
+.modal button{
+  margin-top:1.4rem;padding:.5rem 1.2rem;border:none;border-radius:6px;
+  background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
+.modal button:hover{filter:brightness(1.1)}
 </style>
 </head>
 <body>
-<h1>Find the hidden shapes</h1>
-<p id="rules">Drag a word onto the figure to match its hidden shape.<br>
-Each word gets <strong>two&nbsp;chances</strong> — two wrong drops and it’s crossed&nbsp;out.</p>
 
-<div id="board"></div>
-<div id="wordBank"></div>
+<!-- left column: words -->
+<div id="wordPane"></div>
 
-<!-- replay -->
-<div id="overlay"><div class="dialog">
-  <h2>Well done! ??</h2><p>You found them all.</p>
-  <button id="replayBtn">Play again</button>
-</div></div>
+<!-- right column: SVG -->
+<div id="boardPane"><div id="board"></div></div>
+
+<!-- intro overlay -->
+<div id="intro" class="overlay show">
+  <div class="modal" id="introStep1">
+    <h3>Find the hidden shapes</h3>
+    <p>Drag a word onto the figure to match its hidden shape.</p>
+    <button id="nextBtn">Next</button>
+  </div>
+  <div class="modal" id="introStep2" style="display:none">
+    <h3>But be careful!</h3>
+    <p>Each word gets just <strong>two chances</strong> before it's crossed out.</p>
+    <button id="startBtn">Start</button>
+  </div>
+</div>
+
+<!-- win overlay -->
+<div id="overlay" class="overlay">
+  <div class="modal">
+    <h3>Well done! ðŸ¥³</h3><p>You found them all.</p>
+    <button id="replayBtn">Play again</button>
+  </div>
+</div>
 
 <script>
-/********************* CONFIG ***************************************/
-const CLUES=[{txt:'face',ids:['face']},{txt:'the king',ids:['the-king']},
-{txt:'ten gallon',ids:['ten-gallon']},{txt:'ingress',ids:['ingress']},
-{txt:'touch your toes',ids:['touch-your-toes']},{txt:'fifty five',ids:['fifty-five']},
-{txt:'the thinker',ids:['the-thinker']},{txt:'?',ids:['mystery']},
-{txt:'quaver × 2',ids:['quaver-1','quaver-2']},{txt:'cat',ids:['a-cat']},
-{txt:'w',ids:['w']},{txt:'big heart',ids:['big-heart']},
-{txt:'running late',ids:['running-late']},{txt:'me',ids:['me']},
-{txt:'gnarly',ids:['gnarly']},{txt:'fallin',ids:['fallin']},
-{txt:'shadow boxing',ids:['shadow-boxing']},{txt:'jump for joy',ids:['jump-for-joy']},
-{txt:'little heart',ids:['little-heart']},{txt:'diver',ids:['diver']}];
+/**************** CONFIG (unchanged) ********************************/
+const CLUES=[
+ {txt:'face',ids:['face']},{txt:'the king',ids:['the-king']},
+ {txt:'ten gallon',ids:['ten-gallon']},{txt:'ingress',ids:['ingress']},
+ {txt:'touch your toes',ids:['touch-your-toes']},{txt:'fifty five',ids:['fifty-five']},
+ {txt:'the thinker',ids:['the-thinker']},{txt:'?',ids:['mystery']},
+ {txt:'quaver Ã— 2',ids:['quaver-1','quaver-2']},{txt:'cat',ids:['a-cat']},
+ {txt:'w',ids:['w']},{txt:'big heart',ids:['big-heart']},
+ {txt:'running late',ids:['running-late']},{txt:'me',ids:['me']},
+ {txt:'gnarly',ids:['gnarly']},{txt:'fallin',ids:['fallin']},
+ {txt:'shadow boxing',ids:['shadow-boxing']},{txt:'jump for joy',ids:['jump-for-joy']},
+ {txt:'little heart',ids:['little-heart']},{txt:'diver',ids:['diver']}
+];
 /********************************************************************/
-const board=document.getElementById('board'),bank=document.getElementById('wordBank'),
-      overlay=document.getElementById('overlay');
+const wordPane=document.getElementById('wordPane');
+const board   =document.getElementById('board');
+const winOL   =document.getElementById('overlay');
 document.getElementById('replayBtn').onclick=()=>location.reload();
 
-/* --- load svg ---------------------------------------------------- */
-fetch('figure.svg').then(r=>r.text()).then(txt=>{
-  board.innerHTML=txt; initGame(board.querySelector('svg'));
-}).catch(err=>alert('Could not load figure.svg\n'+err));
+/* -------------------- intro modal logic -------------------------- */
+const introOL=document.getElementById('intro');
+document.getElementById('nextBtn').onclick=()=>{
+  document.getElementById('introStep1').style.display='none';
+  document.getElementById('introStep2').style.display='';
+};
+document.getElementById('startBtn').onclick=()=>{
+  introOL.classList.remove('show');
+};
+
+/* -------------------- load SVG ----------------------------------- */
+fetch('figure.svg')
+  .then(r=>r.text()).then(txt=>{board.innerHTML=txt;initGame(board.querySelector('svg'));})
+  .catch(err=>alert('Could not load figure.svg\n'+err));
 
 function initGame(svg){
-  /* build tiles */
+  /* ------------ build draggable tiles ------------ */
   CLUES.forEach(clue=>{
     const tile=document.createElement('div');
     tile.className='word'; tile.draggable=true; tile.dataset.key=clue.txt;
     tile.state={found:0,lives:2,total:clue.ids.length};
     tile.innerHTML=`<span class="label"></span><span class="lives"></span>`;
-    update(tile);
+    updateLabel(tile);
+    wordPane.appendChild(tile);
 
     tile.addEventListener('dragstart',e=>{
       if(tile.classList.contains('found')){e.preventDefault();return;}
-      document.documentElement.classList.add('dragging');
-
       lens=document.createElement('div'); lens.className='lens';
-      document.body.appendChild(lens); follow(e);
-      document.addEventListener('dragover',follow);
+      document.body.appendChild(lens); moveLens(e);
+      document.addEventListener('dragover',moveLens);
 
-      const ghost=new Image();
-      ghost.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
-      e.dataTransfer.setDragImage(ghost,0,0);
+      const img=new Image();
+      img.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
+      e.dataTransfer.setDragImage(img,0,0);
       e.dataTransfer.effectAllowed='move';
       e.dataTransfer.setData('text/plain',clue.txt);
     });
-
     tile.addEventListener('dragend',()=>{
-      document.documentElement.classList.remove('dragging');
-      document.removeEventListener('dragover',follow);
       lens?.remove(); lens=null;
+      document.removeEventListener('dragover',moveLens);
     });
-
-    bank.appendChild(tile);
   });
 
-  /* every path is a target */
+  /* ------------ paths are targets -------------- */
   svg.querySelectorAll('path').forEach(p=>{
     p.addEventListener('dragover',e=>{e.preventDefault(); e.dataTransfer.dropEffect='move';});
-    p.addEventListener('drop',onDrop);
+    p.addEventListener('drop',handleDrop);
   });
 
-  /* ---- handlers ---- */
-  function onDrop(e){
-    e.preventDefault(); lens&&(lens.style.visibility='hidden');
-    const key=e.dataTransfer.getData('text/plain'),
-          tile=[...bank.children].find(t=>t.dataset.key===key);
+  function handleDrop(e){
+    e.preventDefault();
+    const key=e.dataTransfer.getData('text/plain');
+    const tile=[...wordPane.children].find(t=>t.dataset.key===key);
     if(!tile||tile.classList.contains('found'))return;
-    const clue=CLUES.find(c=>c.txt===key), id=e.target.id||null,
-          ok=id&&clue.ids.includes(id)&&!tile.state[id];
-    ok?found(tile,id):fail(tile);
+
+    const clue=CLUES.find(c=>c.txt===key);
+    const hitId=e.target.id||null;
+    const correct=hitId&&clue.ids.includes(hitId)&&!tile.state[hitId];
+
+    correct ? markFound(tile,hitId) : miss(tile);
   }
 
-  /* ---- helpers ---- */
-  function found(tile,id){
-    tile.state[id]=true; tile.state.found++; update(tile);
-    if(tile.state.found===tile.state.total){tile.classList.add('found');win();}
+  /* ------------ helpers ------------------------ */
+  function markFound(tile,id){
+    tile.state[id]=true; tile.state.found++; updateLabel(tile);
+    if(tile.state.found===tile.state.total){tile.classList.add('found');checkWin();}
   }
-  function fail(tile){
+  function miss(tile){
     if(!tile.state.lives)return;
     tile.state.lives--; tile.classList.add('missed');
-    setTimeout(()=>tile.classList.remove('missed'),250);
-    update(tile);
+    setTimeout(()=>tile.classList.remove('missed'),220);
+    updateLabel(tile);
     if(tile.state.lives===0)tile.classList.add('fail');
   }
-  function update(t){
+  function updateLabel(t){
     const s=t.state;
     t.querySelector('.label').textContent=
-      s.total===1? t.dataset.key : `${t.dataset.key} (${s.found}/${s.total})`;
+      s.total===1? t.dataset.key:`${t.dataset.key} (${s.found}/${s.total})`;
     t.querySelector('.lives').textContent=
-      s.total===1&&s.lives<2?` • ${s.lives}/2`:'';
+      s.total===1&&s.lives<2?` ${s.lives}/2`:'';
   }
-  function win(){
-    if([...bank.children].every(t=>t.classList.contains('found')||t.classList.contains('fail')))
-      overlay.classList.add('show');
+  function checkWin(){
+    if([...wordPane.children].every(t=>t.classList.contains('found')||t.classList.contains('fail')))
+      winOL.classList.add('show');
   }
 
   /* lens follow */
   let lens=null;
-  function follow(e){ if(lens){lens.style.left=(e.clientX-10)+'px'; lens.style.top=(e.clientY-10)+'px';} }
+  function moveLens(e){
+    if(lens){lens.style.left=e.clientX+'px'; lens.style.top=e.clientY+'px';}
+  }
 }
 
-/* --------------- GLOBAL dragover -----------------
-   make the whole page a valid drop target so Chrome
-   never shows its no-drop cursor                       */
-window.addEventListener('dragover',e=>{
-  e.preventDefault();          // allow drop everywhere
-  e.dataTransfer.dropEffect='move';
-});
+/* mute default no-drop cursor everywhere */
+window.addEventListener('dragover',e=>{e.preventDefault(); e.dataTransfer.dropEffect='move';});
 window.addEventListener('drop',e=>e.preventDefault());
 </script>
 </body>
