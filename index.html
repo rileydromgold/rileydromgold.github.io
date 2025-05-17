@@ -21,11 +21,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 
 html,body{height:100%;overflow:hidden;font-family:"MyArtFont",system-ui,sans-serif;
-          background:#f7f7f7;color:#222;display:flex}
+          background:#f7f7f7;color:#fff;display:flex}
 
 #wordPane{width:220px;min-width:180px;padding:1rem .75rem;
           overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;
-          border-right:2px solid #e0e0e0;background:#f7f7f7}
+          border-right:0px solid #e0e0e0;background:#000}
 #boardPane{flex:1;display:flex;justify-content:center;align-items:center}
 #board svg{height:95vh;width:auto;display:block}
 
@@ -34,11 +34,11 @@ html,body{height:100%;overflow:hidden;font-family:"MyArtFont",system-ui,sans-ser
 .answerShown {opacity:1;transition:opacity 2s ease-out}
 
 /* word tiles */
-.word{padding:.42rem .65rem;border:0;border-radius:6px;background:#f7f7f7;
-      cursor:grab;user-select:none;transition:.18s;font-size:.93rem}
-.word:hover{background:#fff}.word:active{cursor:grabbing}
-.word.found{background:var(--accent);color:#fff;cursor:default}
-.word.fail {background:var(--fail);color:#fff;cursor:default}
+.word{padding:.42rem .65rem;border:0;border-radius:6px;background:#000;
+      cursor:grab;user-select:none;transition:0.22s ease-in;font-size:.93rem}
+.word:hover{font-size:1.39rem; transition: all 0.3s ease-out}.word:active{cursor:grabbing}
+.word.found{background:var(--accent);color:#fff;cursor:default;transition:1.5s ease-in;font-size:.93rem}
+.word.fail {background:var(--fail);color:#fff;cursor:default;transition:1.5s ease-in;font-size:.93rem}
 .lives{font-size:.8em;opacity:.8;color:red;margin-left:.35rem}
 @keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(3px)}
 30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
