@@ -15,37 +15,28 @@
 }
 </style>
 
-<!-- styling -->
+<!-- layout & visuals -->
 <style>
 :root{--accent:#2aaa3e;--fail:#c44;--lens:45px}
 *{box-sizing:border-box;margin:0;padding:0}
 
-html,body{
-  height:100%;width:100%;overflow:hidden;
-  font-family:"MyArtFont",system-ui,sans-serif;background:#f7f7f7;color:#222;
-  display:flex
-}
+html,body{height:100%;overflow:hidden;font-family:"MyArtFont",system-ui,sans-serif;
+          background:#f7f7f7;color:#222;display:flex}
 
-/* === layout ===================================================== */
-#wordPane{
-  width:220px;min-width:180px;max-width:260px;
-  padding:1rem .75rem;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;
-  border-right:2px solid #e0e0e0;background:#f7f7f7
-}
+#wordPane{width:220px;min-width:180px;padding:1rem .75rem;
+          overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;
+          border-right:2px solid #e0e0e0;background:#f7f7f7}
 #boardPane{flex:1;display:flex;justify-content:center;align-items:center}
-#board{max-height:100%;max-width:100%;}
-
-/* figure scales with height */
 #board svg{height:95vh;width:auto;display:block}
 
-/* === word tiles ================================================ */
-.word{
-  display:block;padding:.4rem .65rem;border:0;border-radius:6px;
-  background:#f7f7f7;cursor:grab;user-select:none;transition:.18s;
-  font-size:.93rem
-}
-.word:hover{background:#fff}
-.word:active{cursor:grabbing}
+/* answer overlays ─ hidden by default */
+.answerHidden{opacity:0;pointer-events:none}
+.answerShown {opacity:1;transition:opacity 2s ease-out}
+
+/* word tiles */
+.word{padding:.42rem .65rem;border:0;border-radius:6px;background:#f7f7f7;
+      cursor:grab;user-select:none;transition:.18s;font-size:.93rem}
+.word:hover{background:#fff}.word:active{cursor:grabbing}
 .word.found{background:var(--accent);color:#fff;cursor:default}
 .word.fail {background:var(--fail);color:#fff;cursor:default}
 .lives{font-size:.8em;opacity:.8;color:red;margin-left:.35rem}
@@ -53,101 +44,108 @@ html,body{
 30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
 .missed{animation:shake .22s}
 
-/* === lens ======================================================= */
-.lens{
-  position:fixed;z-index:10000;width:var(--lens);height:var(--lens);
-  margin:-22.5px 0 0 -22.5px;border-radius:50%;background:#fff;
-  pointer-events:none;mix-blend-mode:difference}
+/* lens */
+.lens{position:fixed;z-index:10000;width:var(--lens);height:var(--lens);
+      margin:calc(-1*var(--lens)/2) 0 0 calc(-1*var(--lens)/2);
+      border-radius:50%;background:#fff;mix-blend-mode:difference;pointer-events:none}
 
-/* === overlays =================================================== */
-.overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);
-  display:grid;place-items:center;opacity:0;pointer-events:none;transition:.3s}
+/* overlays (intro & win) */
+.overlay{position:fixed;inset:0;display:grid;place-items:center;
+         background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:.3s}
 .overlay.show{opacity:1;pointer-events:auto}
 .modal{background:#fff;padding:2rem 2.5rem;border-radius:12px;
        box-shadow:0 6px 30px rgba(0,0,0,.25);text-align:center;max-width:320px}
 .modal h3{margin:.2rem 0 1rem;font-size:1.35rem}
 .modal p{line-height:1.4;font-size:.94rem}
-.modal button{
-  margin-top:1.4rem;padding:.5rem 1.2rem;border:none;border-radius:6px;
-  background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
+.modal button{margin-top:1.4rem;padding:.5rem 1.2rem;border:none;border-radius:6px;
+              background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
 .modal button:hover{filter:brightness(1.1)}
 </style>
 </head>
 <body>
 
-<!-- left column: words -->
+<!-- word list -->
 <div id="wordPane"></div>
 
-<!-- right column: SVG -->
+<!-- figure -->
 <div id="boardPane"><div id="board"></div></div>
 
-<!-- intro overlay -->
+<!-- intro (two steps) -->
 <div id="intro" class="overlay show">
-  <div class="modal" id="introStep1">
+  <div class="modal" id="step1">
     <h3>Find the hidden shapes</h3>
     <p>Drag a word onto the figure to match its hidden shape.</p>
     <button id="nextBtn">Next</button>
   </div>
-  <div class="modal" id="introStep2" style="display:none">
+  <div class="modal" id="step2" style="display:none">
     <h3>But be careful!</h3>
-    <p>Each word gets just <strong>two chances</strong> before it's crossed out.</p>
+    <p>Each word gets just <strong>two chances</strong> before it’s crossed out.</p>
     <button id="startBtn">Start</button>
   </div>
 </div>
 
-<!-- win overlay -->
-<div id="overlay" class="overlay">
+<!-- win -->
+<div id="win" class="overlay">
   <div class="modal">
-    <h3>Well done! 🥳</h3><p>You found them all.</p>
+    <h3 id="winTitle">Well done!</h3>
+    <p>You found them all.</p>
     <button id="replayBtn">Play again</button>
   </div>
 </div>
 
 <script>
-/**************** CONFIG (unchanged) ********************************/
+/********************* CONFIG ***************************************/
 const CLUES=[
- {txt:'face',ids:['face']},{txt:'the king',ids:['the-king']},
- {txt:'ten gallon',ids:['ten-gallon']},{txt:'ingress',ids:['ingress']},
- {txt:'touch your toes',ids:['touch-your-toes']},{txt:'fifty five',ids:['fifty-five']},
- {txt:'the thinker',ids:['the-thinker']},{txt:'?',ids:['mystery']},
- {txt:'quaver × 2',ids:['quaver-1','quaver-2']},{txt:'cat',ids:['a-cat']},
- {txt:'w',ids:['w']},{txt:'big heart',ids:['big-heart']},
- {txt:'running late',ids:['running-late']},{txt:'me',ids:['me']},
- {txt:'gnarly',ids:['gnarly']},{txt:'fallin',ids:['fallin']},
- {txt:'shadow boxing',ids:['shadow-boxing']},{txt:'jump for joy',ids:['jump-for-joy']},
- {txt:'little heart',ids:['little-heart']},{txt:'diver',ids:['diver']}
+ {txt:'face',            ids:['face']},
+ {txt:'the king',        ids:['the-king']},
+ {txt:'ten gallon',      ids:['ten-gallon']},
+ {txt:'ingress',         ids:['ingress']},
+ {txt:'touch your toes', ids:['touch-your-toes']},
+ {txt:'fifty five',      ids:['fifty-five']},
+ {txt:'the thinker',     ids:['the-thinker']},
+ {txt:'?',               ids:['mystery']},
+ {txt:'quaver × 2',      ids:['quaver-1','quaver-2']},
+ {txt:'cat',             ids:['a-cat']},
+ {txt:'w',               ids:['w']},
+ {txt:'big heart',       ids:['big-heart']},
+ {txt:'running late',    ids:['running-late']},
+ {txt:'me',              ids:['me']},
+ {txt:'gnarly',          ids:['gnarly']},
+ {txt:'fallin',          ids:['fallin']},
+ {txt:'shadow boxing',   ids:['shadow-boxing']},
+ {txt:'jump for joy',    ids:['jump-for-joy']},
+ {txt:'little heart',    ids:['little-heart']},
+ {txt:'diver',           ids:['diver']}
 ];
 /********************************************************************/
 const wordPane=document.getElementById('wordPane');
 const board   =document.getElementById('board');
-const winOL   =document.getElementById('overlay');
-document.getElementById('replayBtn').onclick=()=>location.reload();
+const winOL   =document.getElementById('win');
+const winTitle=document.getElementById('winTitle');
+replayBtn.onclick=()=>location.reload();
 
-/* -------------------- intro modal logic -------------------------- */
-const introOL=document.getElementById('intro');
-document.getElementById('nextBtn').onclick=()=>{
-  document.getElementById('introStep1').style.display='none';
-  document.getElementById('introStep2').style.display='';
-};
-document.getElementById('startBtn').onclick=()=>{
-  introOL.classList.remove('show');
-};
+/* intro nav */
+nextBtn.onclick=()=>{step1.style.display='none';step2.style.display='';};
+startBtn.onclick=()=>intro.classList.remove('show');
 
-/* -------------------- load SVG ----------------------------------- */
-fetch('figure.svg')
-  .then(r=>r.text()).then(txt=>{board.innerHTML=txt;initGame(board.querySelector('svg'));})
-  .catch(err=>alert('Could not load figure.svg\n'+err));
+/* load SVG */
+fetch('figure.svg').then(r=>r.text()).then(txt=>{
+  board.innerHTML=txt;
+
+  /* mark answer paths */
+  board.querySelectorAll('#hitzone-answers > [id]').forEach(el=>el.classList.add('answerHidden'));
+
+  initGame(board.querySelector('svg'));
+});
 
 function initGame(svg){
-  /* ------------ build draggable tiles ------------ */
+  /* build tiles */
   CLUES.forEach(clue=>{
     const tile=document.createElement('div');
     tile.className='word'; tile.draggable=true; tile.dataset.key=clue.txt;
     tile.state={found:0,lives:2,total:clue.ids.length};
     tile.innerHTML=`<span class="label"></span><span class="lives"></span>`;
-    updateLabel(tile);
-    wordPane.appendChild(tile);
+    update(tile); wordPane.appendChild(tile);
 
     tile.addEventListener('dragstart',e=>{
       if(tile.classList.contains('found')){e.preventDefault();return;}
@@ -162,43 +160,59 @@ function initGame(svg){
       e.dataTransfer.setData('text/plain',clue.txt);
     });
     tile.addEventListener('dragend',()=>{
-      lens?.remove(); lens=null;
-      document.removeEventListener('dragover',moveLens);
+      lens?.remove(); lens=null; document.removeEventListener('dragover',moveLens);
     });
   });
 
-  /* ------------ paths are targets -------------- */
+  /* paths are drop targets */
   svg.querySelectorAll('path').forEach(p=>{
-    p.addEventListener('dragover',e=>{e.preventDefault(); e.dataTransfer.dropEffect='move';});
+    p.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
     p.addEventListener('drop',handleDrop);
   });
 
-  function handleDrop(e){
-    e.preventDefault();
-    const key=e.dataTransfer.getData('text/plain');
-    const tile=[...wordPane.children].find(t=>t.dataset.key===key);
-    if(!tile||tile.classList.contains('found'))return;
+  function baseId(raw){
+  if(!raw) return '';
+  //  remove trailing “_digits_” Illustrator adds to duplicates
+  return raw.replace(/_\d+_?$/,'')
+            .replace(/-answers$/,'');        // strip “-answers” overlay tag
+}
 
-    const clue=CLUES.find(c=>c.txt===key);
-    const hitId=e.target.id||null;
-    const correct=hitId&&clue.ids.includes(hitId)&&!tile.state[hitId];
+function handleDrop(e){
+  e.preventDefault();
+  const key  = e.dataTransfer.getData('text/plain');
+  const tile = [...wordPane.children].find(t=>t.dataset.key===key);
+  if(!tile||tile.classList.contains('found')) return;
 
-    correct ? markFound(tile,hitId) : miss(tile);
+  const clue = CLUES.find(c=>c.txt===key);
+  const idRaw = e.target.id || '';
+  const id    = baseId(idRaw);
+
+  const correct = id && clue.ids.includes(id) && !tile.state[id];
+  correct ? found(tile,id) : miss(tile);
+}
+
+function found(tile,id){
+  tile.state[id]=true;
+  tile.state.found++;
+  update(tile);
+
+  /* fade in overlay (accept either exact “id-answers” or any Illustrator suffix) */
+  board.querySelectorAll(`#hitzone-answers [id^="${id}-answers"]`)
+       .forEach(el=>el.classList.replace('answerHidden','answerShown'));
+
+  if(tile.state.found===tile.state.total){
+    tile.classList.add('found');
+    checkWin();
   }
-
-  /* ------------ helpers ------------------------ */
-  function markFound(tile,id){
-    tile.state[id]=true; tile.state.found++; updateLabel(tile);
-    if(tile.state.found===tile.state.total){tile.classList.add('found');checkWin();}
-  }
+}
   function miss(tile){
     if(!tile.state.lives)return;
     tile.state.lives--; tile.classList.add('missed');
     setTimeout(()=>tile.classList.remove('missed'),220);
-    updateLabel(tile);
+    update(tile);
     if(tile.state.lives===0)tile.classList.add('fail');
   }
-  function updateLabel(t){
+  function update(t){
     const s=t.state;
     t.querySelector('.label').textContent=
       s.total===1? t.dataset.key:`${t.dataset.key} (${s.found}/${s.total})`;
@@ -206,20 +220,22 @@ function initGame(svg){
       s.total===1&&s.lives<2?` ${s.lives}/2`:'';
   }
   function checkWin(){
-    if([...wordPane.children].every(t=>t.classList.contains('found')||t.classList.contains('fail')))
+    const found=[...wordPane.children].filter(t=>t.classList.contains('found')).length;
+    if(found+[...wordPane.children].filter(t=>t.classList.contains('fail')).length===CLUES.length){
+      winTitle.textContent=`You found ${found} / ${CLUES.length} shapes!`;
       winOL.classList.add('show');
+    }
   }
 
   /* lens follow */
   let lens=null;
-  function moveLens(e){
-    if(lens){lens.style.left=e.clientX+'px'; lens.style.top=e.clientY+'px';}
-  }
+  function moveLens(e){ if(lens){lens.style.left=e.clientX+'px'; lens.style.top=e.clientY+'px';} }
 }
 
-/* mute default no-drop cursor everywhere */
-window.addEventListener('dragover',e=>{e.preventDefault(); e.dataTransfer.dropEffect='move';});
+/* suppress no-drop cursor */
+window.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
 window.addEventListener('drop',e=>e.preventDefault());
 </script>
 </body>
 </html>
+
