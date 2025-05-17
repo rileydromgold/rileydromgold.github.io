@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hidden-Object Drag Game</title>
+
+<!-- === Custom Font ================================================ -->
+<style>
+@font-face{
+  font-family:"MyArtFont";
+  src:
+    url("fonts/Apercu-Mono-Pro-Light.woff2") format("woff2"),
+    url("fonts/Apercu-Mono-Pro-Light.otf")   format("opentype");
+  font-weight:normal;
+  font-style:normal;
+  font-display:swap;
+}
+</style>
+
+<!-- === Minimal / artsy styling ==================================== -->
+<style>
+:root{--accent:#2aaa3e;--fail:#c44}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  height:100%;font-family:"MyArtFont",system-ui,sans-serif;
+  background:#f7f7f7;color:#222;
+  display:flex;flex-direction:column;align-items:center
+}
+h1{margin:1.4rem 0 .4rem;font-size:clamp(1.6rem,3vw,2.4rem)}
+#rules{font-size:.95rem;opacity:.8;margin-bottom:1.1rem;text-align:center}
+
+#board{position:relative;max-width:650px;width:90vw;isolation:isolate}
+#board svg{width:100%;height:auto;display:block}
+
+#wordBank{
+  margin-top:1.5rem;display:flex;flex-wrap:wrap;
+  gap:.5rem;justify-content:center;
+  width:90vw;max-width:800px
+}
+.word{
+  padding:.3rem .6rem;border:1.5px solid #333;border-radius:6px;
+  background:#fff;cursor:grab;user-select:none;transition:.2s all;
+  display:flex;align-items:center;gap:.35rem;font-size:.95rem
+}
+.word:active{cursor:grabbing}
+.word.found{background:var(--accent);border-color:var(--accent);color:#fff;text-decoration:line-through;cursor:default}
+.word.fail {background:var(--fail);  border-color:var(--fail);  color:#fff;text-decoration:line-through;cursor:default}
+.lives{font-size:.8em;opacity:.7}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(3px)}30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
+.missed{animation:shake .25s}
+
+body.dragging{cursor:grabbing !important;}
+
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .3s}
+#overlay.show{opacity:1;pointer-events:auto}
+.dialog{background:#fff;padding:2rem 2.5rem;border-radius:12px;
+  box-shadow:0 6px 30px rgba(0,0,0,.25);text-align:center}
+.dialog h2{margin:0 0 .7rem;font-size:1.6rem}
+.dialog button{margin-top:1rem;padding:.55rem 1.3rem;border:none;border-radius:6px;
+  background:var(--accent);color:#fff;font-size:1rem;cursor:pointer}
+.dialog button:hover{filter:brightness(1.1)}
+</style>
+</head>
+<body>
+<h1>Find the hidden shapes</h1>
+<p id="rules">Drag a word onto the figure to match its hidden shape.<br>
+Each word gets <strong>two chances</strong>&nbsp;—&nbsp;two wrong drops and it’s crossed&nbsp;out.</p>
+
+<div id="board"></div>
+<div id="wordBank"></div>
+
+<!-- Win / replay overlay -->
+<div id="overlay">
+  <div class="dialog">
+    <h2>Well done! ??</h2>
+    <p>You found them all.</p>
+    <button id="replayBtn">Play again</button>
+  </div>
+</div>
+
+<script>
+/************************  CONFIG  ***********************************/
+const CLUES = [
+  { txt:'face',            ids:['face'] },
+  { txt:'the king',        ids:['the-king'] },
+  { txt:'ten gallon',      ids:['ten-gallon'] },
+  { txt:'ingress',         ids:['ingress'] },
+  { txt:'touch your toes', ids:['touch-your-toes'] },
+  { txt:'fifty five',      ids:['fifty-five'] },
+  { txt:'the thinker',     ids:['the-thinker'] },
+  { txt:'?',               ids:['mystery'] },
+  { txt:'quaver × 2',      ids:['quaver-1','quaver-2'] },
+  { txt:'cat',           ids:['a-cat'] },
+  { txt:'w',               ids:['w'] },
+  { txt:'big heart',       ids:['big-heart'] },
+  { txt:'running late',    ids:['running-late'] },
+  { txt:'me',              ids:['me'] },
+  { txt:'gnarly',          ids:['gnarly'] },
+  { txt:'fallin',          ids:['fallin'] },
+  { txt:'shadow boxing',   ids:['shadow-boxing'] },
+  { txt:'jump for joy',    ids:['jump-for-joy'] },
+  { txt:'little heart',    ids:['little-heart'] },
+  { txt:'diver',           ids:['diver'] }
+];
+/*********************************************************************/
+const board   = document.getElementById('board');
+const bank    = document.getElementById('wordBank');
+const overlay = document.getElementById('overlay');
+document.getElementById('replayBtn').onclick = ()=>location.reload();
+
+fetch('figure.svg')
+  .then(r=>r.text())
+  .then(txt=>{
+    board.innerHTML = txt;
+    initGame(board.querySelector('svg'));
+  })
+  .catch(err=>alert('Could not load figure.svg\n'+err));
+
+function initGame(svg){
+  /* ---------- build draggable tiles ---------- */
+  CLUES.forEach(clue=>{
+    const tile = document.createElement('div');
+    tile.className = 'word';
+    tile.draggable = true;
+    tile.dataset.key = clue.txt;
+    tile.state = {found:0,lives:2,total:clue.ids.length};
+    tile.innerHTML = `<span class="label"></span><span class="lives"></span>`;
+    updateLabel(tile);
+
+    tile.addEventListener('dragstart',e=>{
+      if (tile.classList.contains('found')) { e.preventDefault(); return; }
+      document.body.classList.add('dragging');
+      const ghost = new Image();
+      ghost.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII='; // 1×1 px
+      e.dataTransfer.setDragImage(ghost,0,0);
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain', clue.txt);
+    });
+    tile.addEventListener('dragend',()=>document.body.classList.remove('dragging'));
+    bank.appendChild(tile);
+  });
+
+  /* ---------- accept drops on every black path ---------- */
+  svg.querySelectorAll('path').forEach(p=>{
+    p.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+    });
+    p.addEventListener('drop', handleDrop);
+  });
+
+  function handleDrop(e){
+    e.stopPropagation();          // avoid bubbling up to svg (no double count)
+    e.preventDefault();
+
+    const key  = e.dataTransfer.getData('text/plain');
+    const tile = [...bank.children].find(t=>t.dataset.key===key);
+    if (!tile || tile.classList.contains('found')) return;
+
+    const clue   = CLUES.find(c=>c.txt===key);
+    const hitId  = e.target.id || null;
+    const correct= hitId && clue.ids.includes(hitId) && !tile.state[hitId];
+
+    if (correct){
+      tile.state[hitId] = true;
+      tile.state.found++;
+      updateLabel(tile);
+      if (tile.state.found === tile.state.total){
+        tile.classList.add('found');
+        checkWin();
+      }
+    }else{
+      miss(tile);
+    }
+  }
+
+  /* ---------- helpers ---------- */
+  function miss(tile){
+    if (tile.state.lives===0) return;
+    tile.state.lives--;
+    tile.classList.add('missed');
+    setTimeout(()=>tile.classList.remove('missed'),250);
+    updateLabel(tile);
+    if (tile.state.lives===0) tile.classList.add('fail');
+  }
+
+  function updateLabel(tile){
+    const st=tile.state;
+    tile.querySelector('.label').textContent =
+      st.total===1 ? tile.dataset.key
+                   : `${tile.dataset.key} (${st.found}/${st.total})`;
+    tile.querySelector('.lives').textContent =
+      st.total===1 && st.lives<2 ? ` • ${st.lives}/2` : '';
+  }
+
+  function checkWin(){
+    if ([...bank.children].every(t=>
+         t.classList.contains('found') || t.classList.contains('fail')))
+      overlay.classList.add('show');
+  }
+}
+</script>
+</body>
+</html>
